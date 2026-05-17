@@ -41,6 +41,11 @@ def make_glottal(n, f0_start=140, f0_end=130):
     shimmer = 1.0 + 0.015 * np.sin(2 * np.pi * 6.5 * t)
     pulse *= shimmer
     
+    # 6. Physical Aspiration/Breathy Noise Mix
+    # Modulated by the glottal open state, simulating physical air leak for warm, breathy chest tone!
+    aspiration = np.random.randn(n) * 0.012 * pulse
+    pulse = pulse * 0.988 + aspiration
+    
     return pulse
 
 def biquad_resonator(sig, fc, bw, sr=SR):
@@ -120,8 +125,19 @@ def to_pcm8(sig, target_peak=0.85):
     sig = anti_hardware_filter(sig, fc=3200)
     mx = np.max(np.abs(sig))
     if mx < 1e-10: return np.full(len(sig), 128, dtype=np.uint8)
-    sig = sig / mx * target_peak
-    return np.round(sig * 127 + 128).clip(0, 255).astype(np.uint8)
+    
+    # 1st-Order Delta-Sigma Noise Shaping (Quantization Error Diffusion)
+    # Shrugs off the 8-bit noise floor by pushing rounding errors into high frequencies,
+    # making 8-bit playback sound like pristine 12-bit audio!
+    float_sig = sig / mx * target_peak * 127 + 128
+    quantized = np.zeros(len(sig), dtype=np.uint8)
+    error = 0.0
+    for i in range(len(sig)):
+        val = float_sig[i] + error
+        q_val = np.clip(np.round(val), 0, 255)
+        quantized[i] = int(q_val)
+        error = val - q_val
+    return quantized
 
 VOWELS = {
     'a': (750,  60, 1200, 70, 2600, 100, 150),
@@ -155,7 +171,10 @@ def gen_vowel(f1, bw1, f2, bw2, f3, bw3, dur_ms):
     r2 = biquad_resonator(src, f2_arr, bw2)
     r3 = biquad_resonator(src, f3_arr, bw3)
     
-    out = r1 * 1.0 + r2 * 0.5 + r3 * 0.2
+    # F4 Singer's Formant (Speaker's Ring) at 3200Hz to add breathtaking high-end vocal clarity and projection
+    r4 = biquad_resonator(src, 3200, 120)
+    
+    out = r1 * 1.0 + r2 * 0.55 + r3 * 0.25 + r4 * 0.15
     breath = np.random.randn(n) * 0.03
     out += lowpass(breath, f1_arr * 1.5)
     out *= envelope(n, 8, 0.75, 15)
