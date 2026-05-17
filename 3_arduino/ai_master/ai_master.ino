@@ -191,6 +191,7 @@ void loop() {
           }
           
           basla();
+        }
         Serial.print(F("-> ")); Serial.println(buf);
       }
       p = 0;
