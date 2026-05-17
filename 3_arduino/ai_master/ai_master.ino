@@ -120,9 +120,8 @@ void loop() {
           if (ch >= 0 && ch < 128)
             tbuf[idx++] = pgm_read_byte(&c2p[(uint8_t)ch]);
         }
-        // Append spaces for natural pause
+        // Append single space for natural pause
         if (idx < MAX_TEXT) tbuf[idx++] = 23; // SPACE phoneme index
-        if (idx < MAX_TEXT) tbuf[idx++] = 23;
         
         tlen = idx;
         punc_mode = punc;
@@ -192,12 +191,17 @@ void loop() {
           }
           
           basla();
-        }
         Serial.print(F("-> ")); Serial.println(buf);
       }
       p = 0;
-    } else if (c != '\r' && p < 159) buf[p++] = c;
+    } else if (c != '\r' && p < 309) buf[p++] = c;
   }
+
+  static uint8_t was_playing = 0;
+  if (was_playing && !playing) {
+    Serial.println(F("DONE"));
+  }
+  was_playing = playing;
 }
 
 ISR(TIMER1_COMPA_vect) {

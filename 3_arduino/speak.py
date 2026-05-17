@@ -196,9 +196,15 @@ def main():
                 arduino.write((s + "\n").encode('utf-8'))
                 arduino.flush()
                 
-                # Estimate playback duration of this specific sentence
-                duration = max(2.5, len(s) * 0.16)
-                time.sleep(duration)
+                # Dinamik olarak Arduino'nun cümleyi bitirmesini bekle (Yapay gecikme yok!)
+                import time
+                start_wait = time.time()
+                while time.time() - start_wait < 15.0: # 15s max timeout per sentence
+                    if arduino.in_waiting > 0:
+                        line = arduino.readline().decode('utf-8', errors='ignore').strip()
+                        if "DONE" in line:
+                            break
+                    time.sleep(0.01)
                 
             arduino.close()
         else:
