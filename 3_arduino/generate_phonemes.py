@@ -179,7 +179,7 @@ def gen_vowel(f1, bw1, f2, bw2, f3, bw3, dur_ms):
     out += lowpass(breath, f1_arr * 1.5)
     out *= envelope(n, 8, 0.75, 15)
     out = pre_emphasis(out, 0.6)
-    return to_pcm8(out, 0.90)
+    return to_pcm8(out, 0.45)
 
 def gen_plosive(burst_f, aspiration_f, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -207,7 +207,7 @@ def gen_plosive(burst_f, aspiration_f, dur_ms, voiced=False):
     parts.append(a)
     out = np.concatenate(parts)
     out = pre_emphasis(out, 0.8)
-    return to_pcm8(out, 0.50)
+    return to_pcm8(out, 0.25)
 
 def gen_fricative(center_f, bandwidth, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -219,7 +219,7 @@ def gen_fricative(center_f, bandwidth, dur_ms, voiced=False):
         fric = fric * 0.7 + voice
     fric *= envelope(n, 5, 0.8, 8)
     fric = pre_emphasis(fric, 0.8)
-    return to_pcm8(fric, 0.40)
+    return to_pcm8(fric, 0.20)
 
 def gen_nasal(nasal_f, oral_f, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -230,7 +230,7 @@ def gen_nasal(nasal_f, oral_f, dur_ms):
     out = nasal + oral - anti
     out *= envelope(n, 10, 0.75, 12)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.60)
+    return to_pcm8(out, 0.30)
 
 def gen_liquid(f1, f2, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -247,7 +247,7 @@ def gen_liquid(f1, f2, dur_ms):
         out[i:end] = r1 + r2
     out *= envelope(n, 8, 0.7, 15)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.70)
+    return to_pcm8(out, 0.35)
 
 def gen_trill(f1, f2, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -260,7 +260,7 @@ def gen_trill(f1, f2, dur_ms):
     out = r1 + r2
     out *= envelope(n, 5, 0.7, 10)
     out = pre_emphasis(out, 0.6)
-    return to_pcm8(out, 0.75)
+    return to_pcm8(out, 0.38)
 
 def gen_glide(f1, f2_start, f2_end, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -277,7 +277,7 @@ def gen_glide(f1, f2_start, f2_end, dur_ms):
         out[i:end] = r1 + r2
     out *= envelope(n, 10, 0.7, 15)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.80)
+    return to_pcm8(out, 0.40)
 
 def gen_affricate(burst_f, fric_f, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -296,7 +296,7 @@ def gen_affricate(burst_f, fric_f, dur_ms, voiced=False):
     fric *= envelope(fric_n, 3, 0.7, 10)
     out = np.concatenate([stop, fric])
     out = pre_emphasis(out, 0.8)
-    return to_pcm8(out, 0.55)
+    return to_pcm8(out, 0.28)
 
 def gen_silence(dur_ms):
     return np.full(int(SR * dur_ms / 1000), 128, dtype=np.uint8)
