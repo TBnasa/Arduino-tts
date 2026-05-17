@@ -138,7 +138,7 @@ def main():
     pcm_data = compile_audio(phoneme_list, phonemes_dict)
     
     output_filename = "kayit.wav"
-    save_wav(output_filename, pcm_data, generate_phonemes.SR)
+    save_wav(output_filename, pcm_data, 24000)
     
     # 2. Send to physical Arduino Master if connected
     if HAS_SERIAL:

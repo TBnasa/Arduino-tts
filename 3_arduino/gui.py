@@ -152,7 +152,7 @@ class TTSApp:
             
             # Generate safe file name and save to 'sesler' folder
             output_filepath = self.get_safe_filename(text)
-            speak.save_wav(output_filepath, pcm_data, generate_phonemes.SR)
+            speak.save_wav(output_filepath, pcm_data, 24000) # Save at 24kHz to match Arduino's slowdown
             
             # 2. Arduino Communication
             selected_port = self.port_var.get()

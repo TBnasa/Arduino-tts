@@ -127,22 +127,14 @@ def anti_hardware_filter(sig, fc=3200, sr=SR):
     return out
 
 def to_pcm8(sig, target_peak=0.85):
-    sig = anti_hardware_filter(sig, fc=3200)
+    # Remove anti-hardware filter and Delta-Sigma noise shaping to ensure 
+    # crystal clear playback on both PC WAV files and the Arduino output.
     mx = np.max(np.abs(sig))
     if mx < 1e-10: return np.full(len(sig), 128, dtype=np.uint8)
     
-    # 1st-Order Delta-Sigma Noise Shaping (Quantization Error Diffusion)
-    # Shrugs off the 8-bit noise floor by pushing rounding errors into high frequencies,
-    # making 8-bit playback sound like pristine 12-bit audio!
+    # Standard clean 8-bit quantization
     float_sig = sig / mx * target_peak * 127 + 128
-    quantized = np.zeros(len(sig), dtype=np.uint8)
-    error = 0.0
-    for i in range(len(sig)):
-        val = float_sig[i] + error
-        q_val = np.clip(np.round(val), 0, 255)
-        quantized[i] = int(q_val)
-        error = val - q_val
-    return quantized
+    return np.clip(np.round(float_sig), 0, 255).astype(np.uint8)
 
 VOWELS = {
     'a': (750,  60, 1200, 70, 2600, 100, 130),
