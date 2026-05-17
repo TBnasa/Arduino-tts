@@ -165,15 +165,19 @@ class TTSApp:
                     arduino = serial.Serial(selected_port, 9600, timeout=1)
                     time.sleep(2.0) # Wait for reboot
                     
-                    self.set_status("Metin gönderiliyor...", self.accent_color)
-                    arduino.write((text + "\n").encode('utf-8'))
-                    arduino.flush()
+                    # Send sentences one-by-one to support precise punctuation pitch glides
+                    sentences = [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
                     
-                    # Estimate playback duration
-                    duration = max(3.0, len(text) * 0.16)
-                    
-                    self.set_status("Hoparlörden çalınıyor...", "#00FF00")
-                    time.sleep(duration)
+                    for idx, s in enumerate(sentences):
+                        display_text = s[:30] + "..." if len(s) > 30 else s
+                        self.set_status(f"Konuşuyor ({idx+1}/{len(sentences)}): {display_text}", "#00FF00")
+                        arduino.write((s + "\n").encode('utf-8'))
+                        arduino.flush()
+                        
+                        # Estimate playback duration of this specific sentence
+                        duration = max(2.5, len(s) * 0.16)
+                        time.sleep(duration)
+                        
                     arduino.close()
                     
                     self.set_status(f"Tamamlandı! Kayıt: {output_filepath}", "#00FF00")

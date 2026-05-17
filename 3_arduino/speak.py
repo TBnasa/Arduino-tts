@@ -186,15 +186,20 @@ def main():
             else:
                 print("[+] Arduino başarıyla hazırlandı!")
                 
-            # Send text to Arduino (ending with newline)
-            print("[*] Metin gönderiliyor ve Arduino konuşturuluyor...")
-            arduino.write((text + "\n").encode('utf-8'))
-            arduino.flush()
+            # Send sentences one-by-one to support precise punctuation pitch glides
+            import re
+            sentences = [s for s in re.split(r'(?<=[.!?])\s+', text.strip()) if s.strip()]
+            print(f"[*] Toplam {len(sentences)} cümle tespit edildi. Sırayla gönderiliyor...")
             
-            # Keep serial port open during playback to prevent DTR reset!
-            print("[*] Hoparlörden çalınması bekleniyor (lütfen bekleyin)...")
-            duration = max(3.0, len(text) * 0.16) # Estimate play duration
-            time.sleep(duration)
+            for idx, s in enumerate(sentences):
+                print(f"[*] Cümle {idx+1}/{len(sentences)}: '{s}'")
+                arduino.write((s + "\n").encode('utf-8'))
+                arduino.flush()
+                
+                # Estimate playback duration of this specific sentence
+                duration = max(2.5, len(s) * 0.16)
+                time.sleep(duration)
+                
             arduino.close()
         else:
             print("[!] Bilgi: Bağlı Arduino Master bulunamadı. Sadece PC'ye ses kaydedildi.")
