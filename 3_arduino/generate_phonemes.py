@@ -140,11 +140,11 @@ def to_pcm8(sig, target_peak=0.85):
     return quantized
 
 VOWELS = {
-    'a': (750,  60, 1200, 70, 2600, 100, 150),
-    'e': (500,  50, 1800, 60, 2500,  90, 150),
-    'i': (280,  40, 2250, 60, 2900,  80, 150),
-    'o': (500,  50,  850, 60, 2600, 100, 150),
-    'u': (320,  40,  750, 50, 2500,  90, 150),
+    'a': (750,  60, 1200, 70, 2600, 100, 155),
+    'e': (500,  50, 1800, 60, 2500,  90, 155),
+    'i': (280,  40, 2250, 60, 2900,  80, 155),
+    'o': (500,  50,  850, 60, 2600, 100, 155),
+    'u': (320,  40,  750, 50, 2500,  90, 155),
 }
 
 def make_formant_transition(target, n):
@@ -305,25 +305,25 @@ def generate_all():
     phonemes = {}
     for ch, (f1,bw1,f2,bw2,f3,bw3,dur) in VOWELS.items():
         phonemes[ch.upper()] = gen_vowel(f1,bw1,f2,bw2,f3,bw3,dur)
-    phonemes['B'] = gen_plosive(400, 800, 75, voiced=True)
-    phonemes['C'] = gen_affricate(400, 2500, 80, voiced=False)
-    phonemes['D'] = gen_plosive(400, 1700, 75, voiced=True)
-    phonemes['F'] = gen_fricative(2500, 1500, 75, voiced=False)
-    phonemes['G'] = gen_plosive(300, 1200, 75, voiced=True)
-    phonemes['H'] = gen_fricative(1500, 3000, 70, voiced=False)
-    phonemes['J'] = gen_affricate(300, 2200, 80, voiced=True)
-    phonemes['K'] = gen_plosive(400, 1500, 70, voiced=False)
-    phonemes['L'] = gen_liquid(350, 1100, 85)
-    phonemes['M'] = gen_nasal(280, 900, 85)
-    phonemes['N'] = gen_nasal(280, 1500, 85)
-    phonemes['P'] = gen_plosive(500, 1200, 70, voiced=False)
-    phonemes['R'] = gen_trill(350, 1300, 80)
-    phonemes['S'] = gen_fricative(4500, 2000, 75, voiced=False)
-    phonemes['T'] = gen_plosive(500, 1800, 70, voiced=False)
-    phonemes['V'] = gen_fricative(800, 600, 75, voiced=True)
-    phonemes['Y'] = gen_glide(280, 2400, 1800, 85)
-    phonemes['Z'] = gen_fricative(3500, 1500, 75, voiced=True)
-    phonemes['SPACE'] = gen_silence(80)
+    phonemes['B'] = gen_plosive(400, 800, 80, voiced=True)
+    phonemes['C'] = gen_affricate(400, 2500, 95, voiced=True)
+    phonemes['D'] = gen_plosive(400, 1700, 80, voiced=True)
+    phonemes['F'] = gen_fricative(2500, 1500, 95, voiced=False)
+    phonemes['G'] = gen_plosive(300, 1200, 80, voiced=True)
+    phonemes['H'] = gen_fricative(1500, 3000, 95, voiced=False)
+    phonemes['J'] = gen_affricate(300, 2200, 95, voiced=True)
+    phonemes['K'] = gen_plosive(400, 1500, 80, voiced=False)
+    phonemes['L'] = gen_liquid(350, 1100, 120)
+    phonemes['M'] = gen_nasal(280, 900, 110)
+    phonemes['N'] = gen_nasal(280, 1500, 110)
+    phonemes['P'] = gen_plosive(500, 1200, 80, voiced=False)
+    phonemes['R'] = gen_trill(350, 1300, 110)
+    phonemes['S'] = gen_fricative(4500, 2000, 95, voiced=False)
+    phonemes['T'] = gen_plosive(500, 1800, 80, voiced=False)
+    phonemes['V'] = gen_fricative(800, 600, 95, voiced=True)
+    phonemes['Y'] = gen_glide(280, 2400, 1800, 120)
+    phonemes['Z'] = gen_fricative(3500, 1500, 95, voiced=True)
+    phonemes['SPACE'] = gen_silence(70)
     return phonemes
 
 def write_header(phonemes, dname, node_idx, total_nodes=3):

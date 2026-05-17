@@ -9,7 +9,7 @@
 #include "phonemes.h"
 
 #define I2C_ADDR   8
-#define MAX_TEXT   150
+#define MAX_TEXT   300
 #define PLAY_HZ   32000
 
 volatile uint8_t  tbuf[MAX_TEXT];

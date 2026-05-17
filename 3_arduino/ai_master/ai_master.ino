@@ -9,7 +9,7 @@
 
 #define SLAVE_ADDR   8
 #define SLAVE2_ADDR  9
-#define MAX_TEXT    150
+#define MAX_TEXT    300
 #define PLAY_HZ    32000
 
 volatile uint8_t  tbuf[MAX_TEXT];
@@ -71,7 +71,7 @@ void setup() {
 static uint8_t utf8_state;
 
 void loop() {
-  static char buf[160];
+  static char buf[310];
   static int  p = 0;
   while (Serial.available()) {
     uint8_t uc = (uint8_t)Serial.read();
