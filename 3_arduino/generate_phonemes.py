@@ -8,8 +8,12 @@ import os
 
 SR = 32000
 CROSSFADE = 256
+PITCH_STRETCH = 1.33333  # Compensates for 24kHz slowdown so frequencies stay exactly human when stretched in time
+
 
 def make_glottal(n, f0_start=140, f0_end=130):
+    f0_start *= PITCH_STRETCH
+    f0_end *= PITCH_STRETCH
     t = np.arange(n, dtype=np.float64) / SR
     
     # 1. Natural Human Intonation Arch (Syllable-level pitch contour)
@@ -54,14 +58,14 @@ def biquad_resonator(sig, fc, bw, sr=SR):
     
     # Support time-varying parameters (arrays of length equal to signal)
     if np.isscalar(fc):
-        fc_arr = np.full(len(sig), fc, dtype=np.float64)
+        fc_arr = np.full(len(sig), min(fc * PITCH_STRETCH, sr/2.1), dtype=np.float64)
     else:
-        fc_arr = np.array(fc, dtype=np.float64)
+        fc_arr = np.minimum(np.array(fc, dtype=np.float64) * PITCH_STRETCH, sr/2.1)
         
     if np.isscalar(bw):
-        bw_arr = np.full(len(sig), bw, dtype=np.float64)
+        bw_arr = np.full(len(sig), bw * PITCH_STRETCH, dtype=np.float64)
     else:
-        bw_arr = np.array(bw, dtype=np.float64)
+        bw_arr = np.array(bw, dtype=np.float64) * PITCH_STRETCH
         
     for i in range(len(sig)):
         f = fc_arr[i]
@@ -82,9 +86,9 @@ def biquad_resonator(sig, fc, bw, sr=SR):
 
 def lowpass(sig, fc, sr=SR):
     if np.isscalar(fc):
-        fc_arr = np.full(len(sig), fc, dtype=np.float64)
+        fc_arr = np.full(len(sig), min(fc * PITCH_STRETCH, sr/2.1), dtype=np.float64)
     else:
-        fc_arr = np.array(fc, dtype=np.float64)
+        fc_arr = np.minimum(np.array(fc, dtype=np.float64) * PITCH_STRETCH, sr/2.1)
         
     rc = 1.0 / (2 * np.pi * fc_arr)
     dt = 1.0 / sr
@@ -113,6 +117,7 @@ def envelope(n, att_ms=5, hold_ratio=0.7, rel_ms=15):
     return env
 
 def anti_hardware_filter(sig, fc=3200, sr=SR):
+    fc = min(fc * PITCH_STRETCH, sr/2.1)
     rc = 1.0 / (2 * np.pi * fc)
     dt = 1.0 / sr
     a = rc / (rc + dt)
@@ -179,7 +184,7 @@ def gen_vowel(f1, bw1, f2, bw2, f3, bw3, dur_ms):
     out += lowpass(breath, f1_arr * 1.5)
     out *= envelope(n, 8, 0.75, 15)
     out = pre_emphasis(out, 0.6)
-    return to_pcm8(out, 0.45)
+    return to_pcm8(out, 0.70)
 
 def gen_plosive(burst_f, aspiration_f, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -207,7 +212,7 @@ def gen_plosive(burst_f, aspiration_f, dur_ms, voiced=False):
     parts.append(a)
     out = np.concatenate(parts)
     out = pre_emphasis(out, 0.8)
-    return to_pcm8(out, 0.25)
+    return to_pcm8(out, 0.45)
 
 def gen_fricative(center_f, bandwidth, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -219,7 +224,7 @@ def gen_fricative(center_f, bandwidth, dur_ms, voiced=False):
         fric = fric * 0.7 + voice
     fric *= envelope(n, 5, 0.8, 8)
     fric = pre_emphasis(fric, 0.8)
-    return to_pcm8(fric, 0.20)
+    return to_pcm8(fric, 0.35)
 
 def gen_nasal(nasal_f, oral_f, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -230,7 +235,7 @@ def gen_nasal(nasal_f, oral_f, dur_ms):
     out = nasal + oral - anti
     out *= envelope(n, 10, 0.75, 12)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.30)
+    return to_pcm8(out, 0.45)
 
 def gen_liquid(f1, f2, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -247,7 +252,7 @@ def gen_liquid(f1, f2, dur_ms):
         out[i:end] = r1 + r2
     out *= envelope(n, 8, 0.7, 15)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.35)
+    return to_pcm8(out, 0.55)
 
 def gen_trill(f1, f2, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -260,7 +265,7 @@ def gen_trill(f1, f2, dur_ms):
     out = r1 + r2
     out *= envelope(n, 5, 0.7, 10)
     out = pre_emphasis(out, 0.6)
-    return to_pcm8(out, 0.38)
+    return to_pcm8(out, 0.55)
 
 def gen_glide(f1, f2_start, f2_end, dur_ms):
     n = int(SR * dur_ms / 1000)
@@ -277,7 +282,7 @@ def gen_glide(f1, f2_start, f2_end, dur_ms):
         out[i:end] = r1 + r2
     out *= envelope(n, 10, 0.7, 15)
     out = pre_emphasis(out, 0.5)
-    return to_pcm8(out, 0.40)
+    return to_pcm8(out, 0.65)
 
 def gen_affricate(burst_f, fric_f, dur_ms, voiced=False):
     n = int(SR * dur_ms / 1000)
@@ -296,7 +301,7 @@ def gen_affricate(burst_f, fric_f, dur_ms, voiced=False):
     fric *= envelope(fric_n, 3, 0.7, 10)
     out = np.concatenate([stop, fric])
     out = pre_emphasis(out, 0.8)
-    return to_pcm8(out, 0.28)
+    return to_pcm8(out, 0.45)
 
 def gen_silence(dur_ms):
     return np.full(int(SR * dur_ms / 1000), 128, dtype=np.uint8)

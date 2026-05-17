@@ -10,7 +10,7 @@
 #define SLAVE_ADDR   8
 #define SLAVE2_ADDR  9
 #define MAX_TEXT    300
-#define PLAY_HZ    32000
+#define PLAY_HZ    24000
 
 volatile uint8_t  tbuf[MAX_TEXT];
 volatile uint8_t  tlen = 0, playing = 0, ph_idx = 0;
@@ -215,26 +215,23 @@ ISR(TIMER1_COMPA_vect) {
   }
 
   // Adjust playback pitch dynamically based on punctuation mode (Fast Math without division)
-  // Since we are running at 64kHz base rate:
+  // Since we are running at 48kHz base rate (for 24kHz playback):
   if (punc_mode == 'E') {
-    OCR1A = 225; // ~10% faster (249 * 0.9 = 224 -> 225)
+    OCR1A = 298; // ~10% faster (332 * 0.9 = 298.8 -> 298)
   } else if (punc_mode == 'Q' && tlen >= 4 && ph_idx >= (tlen - 4)) {
-    // Soru (?) pitch rise slide (smooth across last 200ms)
-    uint16_t drop = slide_counter >> 7; // Increment speed is doubled, so shift 1 more
-    if (drop > 37) drop = 37;
-    OCR1A = 249 - drop; // Glide up
+    uint16_t drop = slide_counter >> 7;
+    if (drop > 45) drop = 45;
+    OCR1A = 332 - drop; // Glide up
     slide_counter++;
   } else if (punc_mode == 'T' && tlen >= 4 && ph_idx >= (tlen - 4)) {
-    // Statement drop slide (smooth across last 200ms)
-    uint16_t rise = slide_counter >> 8;
-    if (rise > 20) rise = 20;
-    OCR1A = 249 + rise; // Glide down
+    uint16_t drop = slide_counter >> 8;
+    if (drop > 35) drop = 35;
+    OCR1A = 332 + drop; // Glide down
     slide_counter++;
   } else {
     slide_counter = 0;
-    OCR1A = 249; // Standard 64kHz pitch (corresponds to 32kHz sample rate)
+    OCR1A = 332; // Statement standard pitch
   }
-
   uint8_t output_val = 128;
 
   if (!odd_sample) {
