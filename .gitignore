@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary WAV records
+*.wav
+**/sesler/*.wav
+sesler/
+
+# Operating System
+.DS_Store
+Thumbs.db
