@@ -21,7 +21,7 @@ Proje, kolaydan zora doğru 3 farklı donanım ve yazılım katmanına ayrılmı
 ### 3️⃣ [3_arduino](file:///home/tahir/%C4%B0ndirilenler/arduimo-tts/3_arduino) (İleri Düzey / Tam Sürüm)
 * **Açıklama:** **Üç adet Arduino** kartının (1 Master + 2 Slave) belleklerini I2C üzerinden birleştirerek devasa ses kütüphanesi sunar (Toplam 96KB Ses Belleği).
 * **Ses Kalitesi:** 24.000 Hz (CD Kalitesi, tiz korumalı özel empedans tasarımı).
-* **Donanım:** 3 adet Arduino, I2C paralel haberleşme, BC547 Class-A aktif tampon ve ön amfi devresi.
+* **Donanım:** 3 adet Arduino, I2C paralel haberleşme, paralel direnç mikseri ve gürültü süzgeci.
 
 ---
 
