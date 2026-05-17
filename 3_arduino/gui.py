@@ -175,7 +175,6 @@ class TTSApp:
                         arduino.flush()
                         
                         # Dinamik olarak Arduino'nun bitirmesini bekle
-                        import time
                         start_wait = time.time()
                         while time.time() - start_wait < 15.0:
                             if arduino.in_waiting > 0:

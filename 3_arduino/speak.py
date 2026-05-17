@@ -197,7 +197,6 @@ def main():
                 arduino.flush()
                 
                 # Dinamik olarak Arduino'nun cümleyi bitirmesini bekle (Yapay gecikme yok!)
-                import time
                 start_wait = time.time()
                 while time.time() - start_wait < 15.0: # 15s max timeout per sentence
                     if arduino.in_waiting > 0:
