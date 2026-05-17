@@ -10,7 +10,7 @@
 
 #define I2C_ADDR   8
 #define MAX_TEXT   150
-#define PLAY_HZ   24000
+#define PLAY_HZ   32000
 
 volatile uint8_t  tbuf[MAX_TEXT];
 volatile uint8_t  tlen = 0, playing = 0, ph_idx = 0;
@@ -18,9 +18,8 @@ volatile uint16_t sp = 0;
 volatile char     punc_mode = 'T'; // 'T' = statement, 'Q' = question, 'E' = exclamation
 static   uint16_t cur_off, cur_len;
 static   uint16_t nxt_off, nxt_len;
-static   uint8_t  frame_ct = 0;
-static   uint8_t  prev_s = 128;
-static   int16_t  prev_out = 0;  // for gentle smoothing
+static   bool     odd_sample = false;
+static   uint8_t  mid_s = 128;
 
 static void prep_next() {
   if (ph_idx >= tlen) { cur_off=0xFFFF; cur_len=0; nxt_off=0xFFFF; nxt_len=0; return; }
@@ -47,7 +46,7 @@ void setup() {
 
   cli();
   TCCR1A = 0; TCCR1B = 0; TCNT1 = 0;
-  OCR1A  = (F_CPU / PLAY_HZ) - 1;
+  OCR1A  = (F_CPU / (2 * PLAY_HZ)) - 1;
   TCCR1B = _BV(WGM12) | _BV(CS10);
   TIMSK1 = _BV(OCIE1A);
   sei();
@@ -74,8 +73,7 @@ void rx(int n) {
     playing = 0; // Don't start playing yet! Keep silent while receiving.
   } else if (cmd == 'S') {
     // SYNC PLAY trigger received! Start playback in perfect sync!
-    ph_idx = 0; sp = 0; frame_ct = 0;
-    prev_s = 128; prev_out = 0;
+    ph_idx = 0; sp = 0; odd_sample = false; mid_s = 128;
     prep_next();
     playing = (tlen > 0);
     return;
@@ -92,58 +90,102 @@ ISR(TIMER1_COMPA_vect) {
   static uint16_t slide_counter = 0;
   if (!playing || ph_idx >= tlen) {
     slide_counter = 0;
-    DDRD |= (1 << 3); // ALWAYS OUTPUT mode! Restores 333 ohm parallel impedance for user's 100nF filter!
+    odd_sample = false;
+    DDRD |= (1 << 3); // Set Pin 3 to OUTPUT
     OCR2A = 128; OCR2B = 128; playing = 0; return;
   }
 
   // Adjust playback pitch dynamically based on punctuation mode (Fast Math without division)
+  // Since we are running at 64kHz base rate:
   if (punc_mode == 'E') {
-    OCR1A = 600; // ~10% faster and higher pitch for exclamations!
+    OCR1A = 225; // ~10% faster (249 * 0.9 = 224 -> 225)
   } else if (punc_mode == 'Q' && tlen >= 4 && ph_idx >= (tlen - 4)) {
     // Soru (?) pitch rise slide (smooth across last 200ms)
-    uint16_t drop = slide_counter >> 6;
-    if (drop > 100) drop = 100;
-    OCR1A = 666 - drop; // Glide up
+    uint16_t drop = slide_counter >> 7; // Increment speed is doubled, so shift 1 more
+    if (drop > 37) drop = 37;
+    OCR1A = 249 - drop; // Glide up
     slide_counter++;
   } else if (punc_mode == 'T' && tlen >= 4 && ph_idx >= (tlen - 4)) {
     // Statement drop slide (smooth across last 200ms)
-    uint16_t rise = slide_counter >> 7;
-    if (rise > 50) rise = 50;
-    OCR1A = 666 + rise; // Glide down
+    uint16_t rise = slide_counter >> 8;
+    if (rise > 20) rise = 20;
+    OCR1A = 249 + rise; // Glide down
     slide_counter++;
   } else {
     slide_counter = 0;
-    OCR1A = 666; // Standard 24kHz pitch
+    OCR1A = 249; // Standard 64kHz pitch (corresponds to 32kHz sample rate)
   }
 
-  uint8_t s = 128;
-  if (cur_off != 0xFFFF) {
-    s = pgm_read_byte(&pcm[cur_off + sp]);
-  }
+  uint8_t output_val = 128;
 
-  // Crossfade (Smoothly fade between phonemes and fade out at sentence end to prevent pops)
-  if (cur_len > CROSSFADE_SAMPLES && sp >= (cur_len - CROSSFADE_SAMPLES)) {
-    uint16_t fade = sp - (cur_len - CROSSFADE_SAMPLES);
-    uint16_t target_len = (nxt_len > 0) ? nxt_len : CROSSFADE_SAMPLES;
-    if (fade < target_len) {
-      uint8_t ns = 128;
-      if (nxt_off != 0xFFFF && nxt_len > 0) {
-        ns = pgm_read_byte(&pcm[nxt_off + fade]);
+  if (!odd_sample) {
+    // 1. Fetch current sample
+    uint8_t s = 128;
+    if (cur_off != 0xFFFF) {
+      s = pgm_read_byte(&pcm[cur_off + sp]);
+    }
+
+    // Apply crossfade if near the end of phoneme
+    if (cur_len > CROSSFADE_SAMPLES && sp >= (cur_len - CROSSFADE_SAMPLES)) {
+      uint16_t fade = sp - (cur_len - CROSSFADE_SAMPLES);
+      uint16_t target_len = (nxt_len > 0) ? nxt_len : CROSSFADE_SAMPLES;
+      if (fade < target_len) {
+        uint8_t ns = 128;
+        if (nxt_off != 0xFFFF && nxt_len > 0) {
+          ns = pgm_read_byte(&pcm[nxt_off + fade]);
+        }
+        s = ((uint16_t)s * (CROSSFADE_SAMPLES - fade) + (uint16_t)ns * fade) / CROSSFADE_SAMPLES;
       }
-      s = ((uint16_t)s * (CROSSFADE_SAMPLES - fade) + (uint16_t)ns * fade) / CROSSFADE_SAMPLES;
+    }
+
+    // 2. Fetch NEXT sample for interpolation
+    uint8_t next_s = 128;
+    if (sp + 1 < cur_len) {
+      if (cur_off != 0xFFFF) {
+        next_s = pgm_read_byte(&pcm[cur_off + sp + 1]);
+      }
+      
+      // Crossfade logic for the next sample too to keep interpolation seamless
+      uint16_t next_sp = sp + 1;
+      if (cur_len > CROSSFADE_SAMPLES && next_sp >= (cur_len - CROSSFADE_SAMPLES)) {
+        uint16_t fade = next_sp - (cur_len - CROSSFADE_SAMPLES);
+        uint16_t target_len = (nxt_len > 0) ? nxt_len : CROSSFADE_SAMPLES;
+        if (fade < target_len) {
+          uint8_t ns = 128;
+          if (nxt_off != 0xFFFF && nxt_len > 0) {
+            ns = pgm_read_byte(&pcm[nxt_off + fade]);
+          }
+          next_s = ((uint16_t)next_s * (CROSSFADE_SAMPLES - fade) + (uint16_t)ns * fade) / CROSSFADE_SAMPLES;
+        }
+      }
+    } else {
+      // Transition to next phoneme
+      if (nxt_off != 0xFFFF && nxt_len > 0) {
+        next_s = pgm_read_byte(&pcm[nxt_off]);
+      }
+    }
+
+    // Calculate mid-point
+    mid_s = ((uint16_t)s + next_s) >> 1;
+    output_val = s;
+    odd_sample = true;
+
+  } else {
+    // Output the interpolated mid-point and increment sample pointer
+    output_val = mid_s;
+    odd_sample = false;
+
+    sp++;
+    if (sp >= cur_len) {
+      ph_idx++; sp = 0;
+      if (ph_idx >= tlen) { OCR2A = 128; OCR2B = 128; playing = 0; }
+      else prep_next();
     }
   }
 
-  // ALWAYS output the sample (active or crossfaded silence). 
+  // ALWAYS output the sample (active or crossfaded silence).
   // This puts the three 1K resistors in parallel (333 Ohms), fixing the extreme lowpass muffling!
   DDRD |= (1 << 3); 
-  OCR2A = s;
-  OCR2B = s;
-
-  sp++;
-  if (sp >= cur_len) {
-    ph_idx++; sp = 0;
-    if (ph_idx >= tlen) { OCR2A=128; OCR2B=128; playing=0; }
-    else prep_next();
-  }
+  OCR2A = output_val;
+  OCR2B = output_val;
 }

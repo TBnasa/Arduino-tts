@@ -6,8 +6,8 @@ Splits phonemes perfectly into two buckets for Master and Slave Arduinos
 import numpy as np
 import os
 
-SR = 24000
-CROSSFADE = 192
+SR = 32000
+CROSSFADE = 256
 
 def make_glottal(n, f0_start=140, f0_end=130):
     t = np.arange(n, dtype=np.float64) / SR
@@ -296,7 +296,7 @@ def write_header(phonemes, dname, node_idx, total_nodes=3):
     filename = os.path.join(out_dir, 'phonemes.h')
     
     with open(filename, 'w') as f:
-        f.write("// phonemes.h — 3-Node 24kHz Turkish TTS\n")
+        f.write("// phonemes.h — 3-Node 32kHz Turkish TTS\n")
         f.write(f"// {node_name}\n\n")
         f.write("#ifndef PHONEMES_H\n#define PHONEMES_H\n\n")
         f.write("#include <avr/pgmspace.h>\n\n")
