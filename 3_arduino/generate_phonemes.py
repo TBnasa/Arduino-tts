@@ -11,29 +11,63 @@ CROSSFADE = 256
 
 def make_glottal(n, f0_start=140, f0_end=130):
     t = np.arange(n, dtype=np.float64) / SR
-    f0_contour = np.linspace(f0_start, f0_end, n)
+    
+    # 1. Natural Human Intonation Arch (Syllable-level pitch contour)
+    # Pitch starts, rises gently by ~15Hz in the middle, and decays at the end of the phoneme
+    arch = 15.0 * np.sin(np.pi * np.linspace(0, 1, n))
+    # 2. Vocal Vibrato (Subtle 5.5Hz micro-vibrato representing muscle tension)
+    vibrato = 1.5 * np.sin(2 * np.pi * 5.5 * t)
+    f0_contour = np.linspace(f0_start, f0_end, n) + arch + vibrato
+    
     phase = np.cumsum(f0_contour) / SR
     phase = phase % 1.0
     pulse = np.zeros(n)
-    mask_open = phase < 0.6
-    p_open = phase[mask_open] / 0.6
-    pulse[mask_open] = 3*p_open**2 - 2*p_open**3
-    mask_close = (phase >= 0.6) & (phase < 0.8)
-    p_close = (phase[mask_close] - 0.6) / 0.2
+    
+    # 3. Rosenberg Asymmetrical Glottal Pulse (Physical Human Vocal Cord Model)
+    # Slow opening phase (0.0 to 0.4), steep closing phase (0.4 to 0.55), closed phase (0.55 to 1.0)
+    mask_open = phase < 0.4
+    p_open = phase[mask_open] / 0.4
+    pulse[mask_open] = 3 * p_open**2 - 2 * p_open**3
+    
+    mask_close = (phase >= 0.4) & (phase < 0.55)
+    p_close = (phase[mask_close] - 0.4) / 0.15
     pulse[mask_close] = 1.0 - p_close**2
+    
+    # 4. Human Jitter (Micro pitch noise)
     jitter = 1.0 + np.random.randn(n) * 0.005
     pulse *= jitter
+    
+    # 5. Chest/Lung Pressure Shimmer (6.5Hz micro amplitude modulation)
+    shimmer = 1.0 + 0.015 * np.sin(2 * np.pi * 6.5 * t)
+    pulse *= shimmer
+    
     return pulse
 
 def biquad_resonator(sig, fc, bw, sr=SR):
-    w0 = 2 * np.pi * fc / sr
-    alpha = np.sin(w0) * np.sinh(np.log(2)/2 * bw/fc * w0/np.sin(w0)) if fc > 0 else 0.01
-    b0 = alpha; b1 = 0.0; b2 = -alpha
-    a0 = 1 + alpha; a1 = -2 * np.cos(w0); a2 = 1 - alpha
-    b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
     out = np.zeros(len(sig))
     x1 = x2 = y1 = y2 = 0.0
+    
+    # Support time-varying parameters (arrays of length equal to signal)
+    if np.isscalar(fc):
+        fc_arr = np.full(len(sig), fc, dtype=np.float64)
+    else:
+        fc_arr = np.array(fc, dtype=np.float64)
+        
+    if np.isscalar(bw):
+        bw_arr = np.full(len(sig), bw, dtype=np.float64)
+    else:
+        bw_arr = np.array(bw, dtype=np.float64)
+        
     for i in range(len(sig)):
+        f = fc_arr[i]
+        b = bw_arr[i]
+        w0 = 2 * np.pi * f / sr
+        alpha = np.sin(w0) * np.sinh(np.log(2)/2 * b/f * w0/np.sin(w0)) if f > 0 else 0.01
+        b0 = alpha; b1 = 0.0; b2 = -alpha
+        a0 = 1 + alpha; a1 = -2 * np.cos(w0); a2 = 1 - alpha
+        
+        b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+        
         x0 = sig[i]
         y0 = b0*x0 + b1*x1 + b2*x2 - a1*y1 - a2*y2
         x2, x1 = x1, x0
@@ -42,13 +76,19 @@ def biquad_resonator(sig, fc, bw, sr=SR):
     return out
 
 def lowpass(sig, fc, sr=SR):
-    rc = 1.0 / (2 * np.pi * fc)
+    if np.isscalar(fc):
+        fc_arr = np.full(len(sig), fc, dtype=np.float64)
+    else:
+        fc_arr = np.array(fc, dtype=np.float64)
+        
+    rc = 1.0 / (2 * np.pi * fc_arr)
     dt = 1.0 / sr
     a = dt / (rc + dt)
+    
     out = np.zeros(len(sig))
-    out[0] = sig[0] * a
+    out[0] = sig[0] * a[0]
     for i in range(1, len(sig)):
-        out[i] = out[i-1] + a * (sig[i] - out[i-1])
+        out[i] = out[i-1] + a[i] * (sig[i] - out[i-1])
     return out
 
 def pre_emphasis(sig, alpha=0.85):
@@ -91,15 +131,33 @@ VOWELS = {
     'u': (320,  40,  750, 50, 2500,  90, 150),
 }
 
+def make_formant_transition(target, n):
+    att_n = int(n * 0.25)
+    dec_n = int(n * 0.20)
+    hold_n = n - att_n - dec_n
+    
+    att = np.linspace(target * 0.90, target, att_n)
+    hold = np.full(hold_n, target)
+    dec = np.linspace(target, target * 0.95, dec_n)
+    
+    return np.concatenate([att, hold, dec])
+
 def gen_vowel(f1, bw1, f2, bw2, f3, bw3, dur_ms):
     n = int(SR * dur_ms / 1000)
     src = make_glottal(n, f0_start=145, f0_end=130)
-    r1 = biquad_resonator(src, f1, bw1)
-    r2 = biquad_resonator(src, f2, bw2)
-    r3 = biquad_resonator(src, f3, bw3)
+    
+    # Simulate human vocal tract movement over time (coarticulation / formant bending)
+    f1_arr = make_formant_transition(f1, n)
+    f2_arr = make_formant_transition(f2, n)
+    f3_arr = make_formant_transition(f3, n)
+    
+    r1 = biquad_resonator(src, f1_arr, bw1)
+    r2 = biquad_resonator(src, f2_arr, bw2)
+    r3 = biquad_resonator(src, f3_arr, bw3)
+    
     out = r1 * 1.0 + r2 * 0.5 + r3 * 0.2
     breath = np.random.randn(n) * 0.03
-    out += lowpass(breath, f1 * 1.5)
+    out += lowpass(breath, f1_arr * 1.5)
     out *= envelope(n, 8, 0.75, 15)
     out = pre_emphasis(out, 0.6)
     return to_pcm8(out, 0.90)
